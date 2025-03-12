@@ -1,21 +1,18 @@
 package repository
 
 import (
-	"PubNotification/src/notification/domain"
 	"PubNotification/src/notification/domain/entities"
+	"PubNotification/src/notification/infrastructure/adapter"
 )
 
-type NotificationRepository struct{}
-
-func NewNotificationRepository() domain.INotification {
-	return &NotificationRepository{}
+type NotificationRepository struct {
+	rmqClient *adapter.RabbitMQAdapter
 }
 
-func (nr *NotificationRepository) Send(asignature string) (entities.Notification, error) {
-	notification := entities.Notification{
-		ID:         0,
-		Asignature: asignature,
-		Message:    "La asignatura se ha registrado: " + asignature,
-	}
-	return notification, nil
+func NewNotificationRepository(rmqClient *adapter.RabbitMQAdapter) *NotificationRepository {
+	return &NotificationRepository{rmqClient: rmqClient}
+}
+
+func (nr *NotificationRepository) Send(asignature entities.Notification) error {
+	return nr.rmqClient.Send(asignature)
 }

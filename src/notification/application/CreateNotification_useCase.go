@@ -7,29 +7,29 @@ import (
 	"log"
 )
 
-type CreateNotification struct {
-	notificationRepo    domain.INotification
-	serviceNotification repositories.INotificationService
+type CreateAsignature struct {
+	asignatureRepo      domain.INotification
+	serviceNotification repositories.IMessageService
 }
 
-func NewCreateNotification(notificationRepo domain.INotification, serviceNotification repositories.INotificationService) *CreateNotification {
-	return &CreateNotification{
-		notificationRepo:    notificationRepo,
+func NewCreateAsignature(asignatureRepo domain.INotification, serviceNotification repositories.IMessageService) *CreateAsignature {
+	return &CreateAsignature{
+		asignatureRepo:      asignatureRepo,
 		serviceNotification: serviceNotification,
 	}
 }
 
-func (c *CreateNotification) Execute(asignature entities.Notification) (entities.Notification, error) {
-	created, err := c.notificationRepo.Send(asignature.Asignature)
+func (c *CreateAsignature) Execute(asignature entities.Notification) error {
+	err := c.asignatureRepo.Send(asignature)
 	if err != nil {
-		return entities.Notification{}, err
+		return err
 	}
 
-	err = c.serviceNotification.PublishedEvent("AsignatureCreated", created)
+	err = c.serviceNotification.PublishEvent("AsignatureCreated", asignature)
 	if err != nil {
-		log.Printf("Error notifying about created asignature: %v", err)
-		return entities.Notification{}, err
+		log.Printf("Error notificando sobre la asignatura creada: %v", err)
+		return err
 	}
 
-	return created, nil
+	return nil
 }

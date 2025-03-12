@@ -2,6 +2,6 @@ package repositories
 
 import "PubNotification/src/notification/domain/entities"
 
-type INotificationService interface {
-	PublishedEvent(eventType string, notification entities.Notification) error
+type IMessageService interface {
+	PublishEvent(eventType string, asignature entities.Notification) error
 }

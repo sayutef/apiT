@@ -2,48 +2,41 @@ package controllers
 
 import (
 	"PubNotification/src/notification/application"
+	"PubNotification/src/notification/domain"
 	"PubNotification/src/notification/domain/entities"
-	"encoding/json"
-	"log"
-	"net/http"
+	"github.com/gin-gonic/gin"
+	"PubNotification/src/notification/infrastructure/adapter"
 )
 
-// NotificationController gestiona las solicitudes HTTP para las notificaciones.
-type NotificationController struct {
-	service *application.CreateNotification
+type CreateAsignatureController struct {
+	useCase    *application.CreateAsignature
+	asignature domain.INotification
+	wsClient   *adapter.RabbitMQAdapter // Agregar cliente WebSocket
 }
 
-// NewNotificationController crea una instancia de NotificationController.
-func NewNotificationController(service *application.CreateNotification) *NotificationController {
-	return &NotificationController{service: service}
+func NewCreateAsignatureController(useCase *application.CreateAsignature, asignature domain.INotification, wsClient *adapter.RabbitMQAdapter) *CreateAsignatureController {
+	return &CreateAsignatureController{useCase: useCase, asignature: asignature, wsClient: wsClient}
 }
 
-// SendNotification procesa la solicitud para enviar una notificación.
-func (nc *NotificationController) SendNotification(w http.ResponseWriter, r *http.Request) {
-	var body map[string]string
-	err := json.NewDecoder(r.Body).Decode(&body)
+func (cs_a *CreateAsignatureController) Execute(c *gin.Context) {
+	var asignature entities.Notification
+	if err := c.ShouldBindJSON(&asignature); err != nil {
+		c.JSON(400, gin.H{"error": "Datos inválidos"})
+		return
+	}
+
+	err := cs_a.useCase.Execute(asignature)
 	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		c.JSON(500, gin.H{"error": "No se pudo crear la asignatura"})
 		return
 	}
 
-	message, ok := body["message"]
-	if !ok {
-		http.Error(w, "Message not provided", http.StatusBadRequest)
-		return
-	}
+	// Emitir el mensaje a través de WebSocket después de que la asignatura haya sido creada
+	message := "Asignatura registrada correctamente: " + asignature.Asignature
+	cs_a.wsClient.Send(asignature) // Aquí enviaríamos la notificación a través de RabbitMQ (si lo tienes configurado)
 
-	notification := entities.Notification{
-		Asignature: message,
-	}
+	// Notificar en WebSocket
+	cs_a.wsClient.PublishEvent("asignatura_creada", asignature)
 
-	_, err = nc.service.Execute(notification)
-	if err != nil {
-		log.Printf("Error sending notification: %v", err)
-		http.Error(w, "Error sending notification", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Notificación enviada"))
+	c.JSON(200, gin.H{"message": message, "asignature": asignature})
 }

@@ -1,23 +1,30 @@
+// repositories/ServiceNotification.go
 package repositories
 
 import (
-	"PubNotification/src/notification/domain/entities"
-	"log"
+    "PubNotification/src/notification/domain/entities"
+    "log"
 )
 
-type PublisherInterface interface {
-	PublishEvent(eventType string, data entities.Notification) error
-}
-
 type ServiceNotification struct {
-	publisher PublisherInterface
+    imageService IMessageService
 }
 
-func (s *ServiceNotification) PublishedEvent(eventType string, notification entities.Notification) error {
-	log.Printf("Publishing event %s for notification: %v", eventType, notification)
-	return s.publisher.PublishEvent(eventType, notification)
+// Asegúrate de que ServiceNotification implemente la interfaz INotification
+func (sn *ServiceNotification) Send(message entities.Notification) error {
+    log.Println("Sending notification:", message.Message)
+
+    // Usa el servicio imageService para publicar el evento (este es tu método PublishEvent)
+    err := sn.imageService.PublishEvent("AsignatureCreated", message)
+    if err != nil {
+        log.Printf("Error sending notification: %v", err)
+        return err
+    }
+
+    return nil
 }
 
-func NewServiceNotification(publisher PublisherInterface) INotificationService {
-	return &ServiceNotification{publisher: publisher}
+// Crear una nueva instancia de ServiceNotification
+func NewServiceNotification(imageService IMessageService) *ServiceNotification {
+    return &ServiceNotification{imageService: imageService}
 }

@@ -1,51 +1,35 @@
-package dependencies
+// infrastructure/dependencies.go
+package infraestructure
 
 import (
-	"database/sql"
-	"log"
-
-	"PubNotification/src/notification/infrastructure/adapter"
-
-	_ "github.com/go-sql-driver/mysql"
+    "PubNotification/src/notification/application"
+    "PubNotification/src/notification/application/repositories"
+    "PubNotification/src/notification/infrastructure/adapter"
+    "PubNotification/src/notification/infrastructure/controllers"
+    "log"
 )
 
-var (
-	DB            *sql.DB
-	RabbitAdapter *adapter.RabbitMQAdapter
-)
-
-func Init() {
-	log.Println("Inicializando dependencias...")
-
-	var err error
-	if err != nil {
-		log.Fatalf("Error al inicializar MySQL: %v", err)
-	}
-	log.Println("Conexión a MySQL establecida.")
-
-	RabbitAdapter, err = adapter.NewRabbitMQAdapter()
-	if err != nil {
-		log.Fatalf("Error al inicializar RabbitMQ: %v", err)
-	}
-	log.Println("Adaptador RabbitMQ inicializado correctamente.")
+type DependenciesAsignature struct {
+    CreateAsignatureController *controllers.CreateAsignatureController
+    RabbitMQAdapter            *adapter.RabbitMQAdapter
 }
 
-func Close() {
-	log.Println("Cerrando dependencias...")
+func InitAsignature() *DependenciesAsignature {
+    // Crear el cliente de RabbitMQ
+    rmqClient, err := adapter.NewRabbitMQAdapter()
+    if err != nil {
+        log.Fatalf("Error creating RabbitMQ client: %v", err)
+    }
 
-	if RabbitAdapter != nil && RabbitAdapter.Conn() != nil {
-		if err := RabbitAdapter.Conn().Close(); err != nil {
-			log.Printf("Error al cerrar conexión de RabbitMQ: %v", err)
-		} else {
-			log.Println("Conexión de RabbitMQ cerrada.")
-		}
-	}
+    // Crear el servicio de notificación
+    messageService := repositories.NewServiceNotification(rmqClient) // Asegurarse de que messageService implementa INotification
 
-	if DB != nil {
-		if err := DB.Close(); err != nil {
-			log.Printf("Error al cerrar la conexión MySQL: %v", err)
-		} else {
-			log.Println("Conexión MySQL cerrada.")
-		}
-	}
+    // Crear el caso de uso de creación de asignatura
+    createAsignatureUseCase := application.NewCreateAsignature(messageService, rmqClient) // Cambié el orden para cumplir con los parámetros correctos
+
+    // Retornar las dependencias con los controladores configurados
+    return &DependenciesAsignature{
+        CreateAsignatureController: controllers.NewCreateAsignatureController(createAsignatureUseCase, messageService, rmqClient),
+        RabbitMQAdapter:            rmqClient,
+    }
 }

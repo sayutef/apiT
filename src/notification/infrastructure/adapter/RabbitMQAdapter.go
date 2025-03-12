@@ -1,95 +1,63 @@
 package adapter
 
 import (
-	"encoding/json"
-	"log"
-
 	"PubNotification/src/notification/domain/entities"
+	"encoding/json"
+	"fmt"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"log"
 )
 
-// RabbitMQAdapter es el adaptador para conectarse y publicar eventos en RabbitMQ.
 type RabbitMQAdapter struct {
-	conn *amqp.Connection
-	ch   *amqp.Channel
+	conn    *amqp.Connection
+	channel *amqp.Channel
+	queue   amqp.Queue
 }
 
-// NewRabbitMQAdapter crea y retorna un nuevo adaptador de RabbitMQ.
 func NewRabbitMQAdapter() (*RabbitMQAdapter, error) {
-	conn, err := amqp.Dial("amqp://toledo:12345@35.170.134.124:5672/")
+	conn, err := amqp.Dial("amqp://sayuri:12345@54.243.57.144:5672")
 	if err != nil {
-		log.Printf("Error conectando a RabbitMQ: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("Failed to connect to RabbitMQ: %v", err)
 	}
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Printf("Error abriendo canal: %v", err)
-		return nil, err
+		conn.Close()
+		return nil, fmt.Errorf("Failed to open a channel: %v", err)
 	}
 
-	_, err = ch.QueueDeclare(
-		"asignatures", // nombre de la cola
-		true,          // durable
-		false,         // auto-eliminar
-		false,         // no exclusiva
-		false,         // sin esperar
-		nil,           // argumentos adicionales
+	queue, err := ch.QueueDeclare(
+		"notification",
+		true,
+		false,
+		false,
+		false,
+		nil,
 	)
 	if err != nil {
-		log.Printf("Error declarando la cola: %v", err)
-		return nil, err
+		ch.Close()
+		conn.Close()
+		return nil, fmt.Errorf("Failed to declare a queue: %v", err)
 	}
 
-	return &RabbitMQAdapter{conn: conn, ch: ch}, nil
+	return &RabbitMQAdapter{
+		conn:    conn,
+		channel: ch,
+		queue:   queue,
+	}, nil
 }
 
-// Conn devuelve la conexión subyacente de RabbitMQ.
-func (r *RabbitMQAdapter) Conn() *amqp.Connection {
-	return r.conn
-}
-
-// Close cierra el canal y la conexión de RabbitMQ.
-func (r *RabbitMQAdapter) Close() error {
-	if r.ch != nil {
-		if err := r.ch.Close(); err != nil {
-			log.Printf("Error al cerrar el canal de RabbitMQ: %v", err)
-			return err
-		}
-		log.Println("Canal de RabbitMQ cerrado.")
-	}
-
-	if r.conn != nil {
-		if err := r.conn.Close(); err != nil {
-			log.Printf("Error al cerrar la conexión de RabbitMQ: %v", err)
-			return err
-		}
-		log.Println("Conexión de RabbitMQ cerrada.")
-	}
-
-	return nil
-}
-
-// PublishEvent publica un evento en la cola de RabbitMQ.
-func (r *RabbitMQAdapter) PublishEvent(eventType string, data entities.Notification) error {
-	if r.ch == nil || r.ch.IsClosed() {
-		var err error
-		r.ch, err = r.conn.Channel()
-		if err != nil {
-			log.Printf("Error reabriendo el canal de RabbitMQ: %v", err)
-			return err
-		}
-	}
-
-	body, err := json.Marshal(data)
+func (r *RabbitMQAdapter) PublishEvent(queueName string, notification entities.Notification) error {
+	body, err := json.Marshal(notification)
 	if err != nil {
-		log.Printf("Error convirtiendo el evento a JSON: %v", err)
-		return err
+		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
-	err = r.ch.Publish(
+	log.Printf("Enviando mensaje a la cola: %s", queueName)
+
+	err = r.channel.Publish(
 		"",
-		"asignatures", // nombre de la cola
+		queueName,
 		false,
 		false,
 		amqp.Publishing{
@@ -97,12 +65,23 @@ func (r *RabbitMQAdapter) PublishEvent(eventType string, data entities.Notificat
 			Body:        body,
 		},
 	)
-
 	if err != nil {
-		log.Printf("Error enviando mensaje a RabbitMQ: %v", err)
-		return err
+		return fmt.Errorf("failed to publish message: %w", err)
 	}
 
-	log.Println("Evento publicado:", eventType)
+	log.Printf("Mensaje enviado correctamente: %s", body)
 	return nil
+}
+
+func (r *RabbitMQAdapter) Send(notification entities.Notification) error {
+	return r.PublishEvent(r.queue.Name, notification)
+}
+
+func (r *RabbitMQAdapter) Close() {
+	if r.channel != nil {
+		r.channel.Close()
+	}
+	if r.conn != nil {
+		r.conn.Close()
+	}
 }

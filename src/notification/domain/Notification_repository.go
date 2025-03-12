@@ -3,5 +3,5 @@ package domain
 import "PubNotification/src/notification/domain/entities"
 
 type INotification interface {
-	Send(asignature string) (entities.Notification, error)
+	Send(message entities.Notification) error
 }

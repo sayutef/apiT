@@ -1,21 +1,15 @@
-package repository
+package routes
 
 import (
-	"PubNotification/src/notification/domain"
-	"PubNotification/src/notification/domain/entities"
+	"PubNotification/src/notification/infrastructure/controllers"
+	"github.com/gin-gonic/gin"
 )
 
-type NotificationRepository struct{}
+func ConfigureRoutesAsignature(
+	r *gin.Engine,
+	createAsignatureController *controllers.CreateAsignatureController,
 
-func NewNotificationRepository() domain.INotification {
-	return &NotificationRepository{}
-}
+) {
+	r.POST("/send-notification", createAsignatureController.Execute)
 
-func (nr *NotificationRepository) Send(asignature string) (entities.Notification, error) {
-	notification := entities.Notification{
-		ID:         1,
-		Asignature: asignature,
-		Message:    "La asignatura se ha registrado: " + asignature,
-	}
-	return notification, nil
 }

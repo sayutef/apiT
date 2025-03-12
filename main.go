@@ -1,16 +1,18 @@
 package main
 
 import (
-	"PubNotification/src/notification/infrastructure"
-	routes "PubNotification/src/notification/infrastructure/routes"
+	infraestructure "PubNotification/src/notification/infrastructure"
+	"PubNotification/src/notification/infrastructure/routes"
 	"github.com/gin-gonic/gin"
+	"log"
 )
 
 func main() {
-	dependencies.Init()
-	defer dependencies.Close()
+	dependencies := infraestructure.InitAsignature()
+	defer dependencies.RabbitMQAdapter.Close()
 
 	r := gin.Default()
+
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -23,7 +25,9 @@ func main() {
 		c.Next()
 	})
 
-	routes.NewNotificationRepository()
+	routes.ConfigureRoutesAsignature(r, dependencies.CreateAsignatureController)
 
-	r.Run(":8083")
+	if err := r.Run(":8088"); err != nil {
+		log.Fatalf("Error starting server: %v", err)
+	}
 }
